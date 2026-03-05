@@ -1,0 +1,39 @@
+---
+- name: Initialize Kubernetes Cluster
+  shell: kubeadm init --apiserver-advertise-address=192.168.56.11 --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=all
+  register: init_output
+  ignore_errors: yes # Ignore if already initialized
+
+- name: Create .kube directory for vagrant user
+  file:
+    path: /home/vagrant/.kube
+    state: directory
+    owner: vagrant
+    group: vagrant
+
+- name: Copy admin.conf to user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/vagrant/.kube/config
+    remote_src: yes
+    owner: vagrant
+    group: vagrant
+
+- name: Wait for API Server to be ready
+  wait_for:
+    host: 192.168.56.11
+    port: 6443
+    delay: 10
+    timeout: 300
+
+- name: Install Flannel Network Plugin
+  become_user: vagrant
+  shell: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+- name: Get Join Command
+  shell: kubeadm token create --print-join-command
+  register: join_command_raw
+
+- name: Set join command as a fact
+  set_fact:
+    join_command: "{{ join_command_raw.stdout }}"

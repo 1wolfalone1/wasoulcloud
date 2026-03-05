@@ -1,0 +1,20 @@
+# Vagrant metadata and keys (Crucial)
+.vagrant/
+**/vagrant/.vagrant/
+*.log
+
+# Ansible 
+*.retry
+infra/k8s/ansible/ansible.cfg
+
+# Local Kubernetes Config
+config-wacloud
+.kube/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS & IDE
+.DS_Store
+.idea/

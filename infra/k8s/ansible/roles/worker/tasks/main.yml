@@ -1,0 +1,4 @@
+---
+- name: Join Worker to Cluster
+  shell: "{{ hostvars['node-1'].join_command }}"
+  ignore_errors: yes # Ignore if already joined
