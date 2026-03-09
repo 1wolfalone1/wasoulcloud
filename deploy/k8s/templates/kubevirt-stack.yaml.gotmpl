@@ -1,0 +1,7 @@
+useEmulation: {{ env "KUBEVIRT_EMULATION" | default "false" }}
+featureGates:
+  - DataVolumes
+  - LiveMigration
+  - HostDevices
+installStrategy:
+  type: Handoff

@@ -1,4 +1,31 @@
 ---
+- name: Check if node is already joined to the cluster
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_joined
+
+- name: Check current node-ip in kubelet config
+  shell: grep -r "node-ip" /etc/systemd/system/kubelet.service.d/ || echo "not set"
+  register: current_node_ip
+  changed_when: false
+
+- name: Reset and rejoin if wrong IP was used
+  shell: kubeadm reset -f
+  when: 
+    - not worker_joined.stat.exists or "10.0.2.15" in current_node_ip.stdout
+
 - name: Join Worker to Cluster
-  shell: "{{ hostvars['node-1'].join_command }}"
-  ignore_errors: yes # Ignore if already joined
+  shell: "{{ hostvars['node-1'].join_command }} --node-name {{ inventory_hostname }}"
+  when: 
+    - not worker_joined.stat.exists
+    - hostvars['node-1'].join_command is defined
+  register: join_result
+  retries: 3
+  delay: 20
+  until: join_result.rc == 0
+
+- name: Ensure Kubelet is started and enabled
+  systemd:
+    name: kubelet
+    state: started
+    enabled: yes

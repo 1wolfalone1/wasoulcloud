@@ -1,0 +1,16 @@
+helmDefaults:
+  wait: true
+
+hooks:
+  - events: ["prepare"]
+    command: "bash"
+    args:
+      - "-c"
+      - "kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/v1.7.0/kubevirt-operator.yaml && kubectl rollout status deployment/virt-operator -n kubevirt --timeout=300s"
+
+releases:
+  - name: wacloud-virt
+    chart: charts/kubevirt-stack
+    namespace: kubevirt
+    values:
+      - templates/kubevirt-stack.yaml.gotmpl

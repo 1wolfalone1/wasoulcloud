@@ -1,23 +1,27 @@
 ---
-- name: Load bridge netfilter module
+- name: Load bridge netfilter and overlay modules
   modprobe:
-    name: br_netfilter
+    name: "{{ item }}"
     state: present
+  loop:
+    - br_netfilter
+    - overlay
 
-- name: Persist bridge module on reboot
+- name: Persist modules on reboot
   copy:
     dest: /etc/modules-load.d/k8s.conf
     content: |
+      overlay
       br_netfilter
 
-- name: Set bridge-nf-call-iptables to 1
+- name: Set sysctl parameters for K8s networking
   sysctl:
     name: "{{ item }}"
     value: '1'
     sysctl_set: yes
     state: present
     reload: yes
-  with_items:
+  loop:
     - net.bridge.bridge-nf-call-iptables
     - net.bridge.bridge-nf-call-ip6tables
     - net.ipv4.ip_forward
@@ -26,41 +30,45 @@
   shell: |
     swapoff -a
     sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+  changed_when: false
 
 - name: Install Prerequisite Packages
   apt:
     name: [apt-transport-https, ca-certificates, curl, software-properties-common, gnupg2]
     update_cache: yes
 
-- name: Add Docker GPG Key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+# --- Containerd Setup ---
 
-- name: Add Docker Repository
-  apt_repository:
-    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
-    state: present
-
-- name: Install Docker
+- name: Install containerd
   apt:
-    name: docker.io
+    name: containerd
     state: present
 
-- name: Set Docker to use systemd cgroup driver
-  copy:
-    dest: /etc/docker/daemon.json
-    content: |
-      {
-        "exec-opts": ["native.cgroupdriver=systemd"]
-      }
+- name: Create containerd directory
+  file:
+    path: /etc/containerd
+    state: directory
 
-- name: Restart Docker
+- name: Generate default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: Set containerd to use systemd cgroup driver
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+  notify: restart containerd
+
+- name: Ensure containerd is running and enabled
   systemd:
-    name: docker
-    state: restarted
+    name: containerd
+    state: started
     enabled: yes
     daemon_reload: yes
+
+# --- Kubernetes Tools Setup ---
 
 - name: Add Kubernetes GPG Key
   get_url:
@@ -79,4 +87,25 @@
   apt:
     name: [kubelet, kubeadm, kubectl]
     state: present
-    update_cache: yes
+
+- name: Create Kubelet drop-in directory
+  file:
+    path: /etc/systemd/system/kubelet.service.d
+    state: directory
+
+- name: Set node-ip in /etc/default/kubelet
+  copy:
+    dest: /etc/default/kubelet
+    content: |
+      KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }} --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock
+  notify: restart kubelet
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Restart kubelet immediately
+  systemd:
+    name: kubelet
+    state: restarted
+  ignore_errors: yes

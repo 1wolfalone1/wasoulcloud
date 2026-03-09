@@ -1,0 +1,17 @@
+apiVersion: kubevirt.io/v1
+kind: KubeVirt
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  installStrategy:
+    type: Handoff
+  configuration:
+    developerConfiguration:
+      useEmulation: {{ .Values.useEmulation | default false }}
+      featureGates:
+        {{- range .Values.featureGates }}
+        - {{ . }}
+        {{- end }}
+    network:
+      defaultNetworkInterface: bridge

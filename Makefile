@@ -28,6 +28,9 @@ infra-up:
 infra-down:
 	cd $(VAGRANT_DIR) && vagrant halt
 
+infra-reload:
+	cd $(VAGRANT_DIR) && vagrant reload --provision
+
 infra-status:
 	cd $(VAGRANT_DIR) && vagrant status
 
@@ -58,3 +61,24 @@ infra-get-config:
 	@sed -i 's/127.0.0.1/192.168.56.11/g' $(KUBECONFIG_LOCAL)
 	@echo "Config saved to $(KUBECONFIG_LOCAL)"
 	@echo "To use it, run: export KUBECONFIG=$(KUBECONFIG_LOCAL)"
+
+.PHONY: k8s-prep k8s-deploy k8s-diff k8s-destroy k8s-status
+HELMFILE_DIR = deploy/k8s
+HELMFILE     = helmfile -f $(HELMFILE_DIR)/helmfile.yaml
+KUBEVIRT_VER = v1.7.0
+CHART_PATH   = $(HELMFILE_DIR)/charts/kubevirt-stack
+
+k8s-setup:
+	helm plugin install https://github.com/databus23/helm-diff --verify=false || true
+
+k8s-diff:
+	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) diff
+
+k8s-deploy:
+	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) apply
+
+k8s-destroy:
+	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) destroy
+
+k8s-status:
+	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && kubectl get all -n kubevirt
