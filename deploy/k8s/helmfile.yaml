@@ -6,7 +6,10 @@ hooks:
     command: "bash"
     args:
       - "-c"
-      - "kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/v1.7.0/kubevirt-operator.yaml && kubectl rollout status deployment/virt-operator -n kubevirt --timeout=300s"
+      - |
+        kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/v1.7.0/kubevirt-operator.yaml &&
+        kubectl rollout status deployment/virt-operator -n kubevirt --timeout=300s &&
+        until kubectl get crd kubevirts.kubevirt.io 2>/dev/null; do echo "waiting for kubevirt CRD..."; sleep 5; done
 
 releases:
   - name: wacloud-virt

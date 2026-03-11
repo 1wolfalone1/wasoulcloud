@@ -4,8 +4,6 @@ metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
-  installStrategy:
-    type: Handoff
   configuration:
     developerConfiguration:
       useEmulation: {{ .Values.useEmulation | default false }}
@@ -13,5 +11,3 @@ spec:
         {{- range .Values.featureGates }}
         - {{ . }}
         {{- end }}
-    network:
-      defaultNetworkInterface: bridge
