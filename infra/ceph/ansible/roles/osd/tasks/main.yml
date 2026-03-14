@@ -1,0 +1,27 @@
+---
+- name: Check available disks
+  shell: lsblk -dn -o NAME,SIZE | grep -v sda
+  register: available_disks
+  changed_when: false
+
+- name: Add OSDs for all nodes
+  shell: ceph orch daemon add osd {{ item }}:/dev/sdb
+  loop: "{{ groups['ceph_osds'] }}"
+  when: inventory_hostname == groups['ceph_mons'][0]
+  ignore_errors: yes
+
+- name: Wait for OSDs to be up
+  shell: ceph osd stat
+  register: osd_stat
+  until: osd_stat.rc == 0
+  retries: 10
+  delay: 15
+  when: inventory_hostname == groups['ceph_mons'][0]
+
+- name: Create RBD pool for KubeVirt
+  shell: |
+    ceph osd pool create rbd 32
+    ceph osd pool application enable rbd rbd
+    rbd pool init rbd
+  when: inventory_hostname == groups['ceph_mons'][0]
+  ignore_errors: yes

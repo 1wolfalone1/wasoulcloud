@@ -9,14 +9,89 @@ export ANSIBLE_CONFIG = $(ANSIBLE_DIR)/ansible.cfg
 .PHONY: help infra-up infra-down infra-status infra-clean infra-plugin
 
 help:
-	@echo "Wacloud VM Management:"
-	@echo "  make infra-plugin  - Install disksize plugin"
-	@echo "  make infra-up      - Load vboxdrv and boot 5 nodes"
-	@echo "  make infra-down    - Halt all nodes"
-	@echo "  make infra-status  - Check VM states"
-	@echo "  make infra-clean   - Destroy all VMs"
-	@echo "  make ssh-n1        - SSH into node 1 (also n2, n3, n4, n5)"
+	@echo "╔══════════════════════════════════════════════════════╗"
+	@echo "║              Wacloud Management Commands             ║"
+	@echo "╚══════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "── Infrastructure ──────────────────────────────────────"
+	@echo "  make infra-plugin          - Install vagrant disksize plugin"
+	@echo "  make infra-up              - Load vboxdrv and boot 8 nodes"
+	@echo "  make infra-down            - Halt all nodes"
+	@echo "  make infra-reload          - Reload and reprovision all nodes"
+	@echo "  make infra-status          - Check VM states"
+	@echo "  make infra-clean           - Destroy all VMs"
+	@echo "  make ssh-n[1-8]            - SSH into node (e.g. make ssh-n1)"
+	@echo ""
+	@echo "── Ansible ─────────────────────────────────────────────"
+	@echo "  make infra-ansible-ping    - Ping all k8s nodes"
+	@echo "  make infra-ansible-provision - Provision k8s cluster"
+	@echo "  make infra-get-config      - Fetch kubeconfig from node-1"
+	@echo ""
+	@echo "── Kubernetes ──────────────────────────────────────────"
+	@echo "  make k8s-setup             - Install helm plugins"
+	@echo "  make k8s-diff              - Diff helmfile changes"
+	@echo "  make k8s-deploy            - Deploy kubevirt stack"
+	@echo "  make k8s-destroy           - Destroy kubevirt stack"
+	@echo "  make k8s-status            - Check kubevirt status"
+	@echo ""
+	@echo "── Ceph ────────────────────────────────────────────────"
+	@echo "  make ceph-ping             - Ping ceph nodes"
+# Path to the directory containing the Vagrantfile
+VAGRANT_DIR = infra/vm/vagrant/
+ANSIBLE_DIR = infra/k8s/ansible
+INVENTORY   = $(ANSIBLE_DIR)/inventory.ini
+PLAYBOOK    = $(ANSIBLE_DIR)/site.yml
 
+export ANSIBLE_CONFIG = $(ANSIBLE_DIR)/ansible.cfg
+
+KUBECONFIG_LOCAL = ~/.kube/config-wacloud
+HELMFILE_DIR = deploy/k8s
+HELMFILE     = helmfile -f $(HELMFILE_DIR)/helmfile.yaml
+KUBEVIRT_VER = v1.7.0
+CHART_PATH   = $(HELMFILE_DIR)/charts/kubevirt-stack
+CEPH_INVENTORY = infra/ceph/ansible/inventory.ini
+CEPH_PLAYBOOK  = infra/ceph/ansible/site.yml
+
+.PHONY: help \
+	infra-plugin infra-up infra-down infra-reload infra-status infra-clean \
+	infra-k8s-ping infra-k8s-provision infra-k8s-get-config \
+	infra-k8s-setup infra-k8s-diff infra-k8s-deploy infra-k8s-destroy infra-k8s-status \
+	infra-ceph-ping infra-ceph-deploy infra-ceph-status infra-ceph-clean
+
+help:
+	@echo "╔══════════════════════════════════════════════════════╗"
+	@echo "║              Wacloud Management Commands             ║"
+	@echo "╚══════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "── Infrastructure ──────────────────────────────────────"
+	@echo "  make infra-plugin              - Install vagrant disksize plugin"
+	@echo "  make infra-up                  - Load vboxdrv and boot 8 nodes"
+	@echo "  make infra-down                - Halt all nodes"
+	@echo "  make infra-reload              - Reload and reprovision all nodes"
+	@echo "  make infra-status              - Check VM states"
+	@echo "  make infra-clean               - Destroy all VMs"
+	@echo "  make infra-ssh-n[1-8]          - SSH into node (e.g. make infra-ssh-n1)"
+	@echo ""
+	@echo "── Kubernetes Ansible ──────────────────────────────────"
+	@echo "  make infra-k8s-ping            - Ping all k8s nodes"
+	@echo "  make infra-k8s-provision       - Provision k8s cluster"
+	@echo "  make infra-k8s-get-config      - Fetch kubeconfig from node-1"
+	@echo ""
+	@echo "── Kubernetes Helm ─────────────────────────────────────"
+	@echo "  make infra-k8s-setup           - Install helm plugins"
+	@echo "  make infra-k8s-diff            - Diff helmfile changes"
+	@echo "  make infra-k8s-deploy          - Deploy kubevirt stack"
+	@echo "  make infra-k8s-destroy         - Destroy kubevirt stack"
+	@echo "  make infra-k8s-status          - Check kubevirt status"
+	@echo ""
+	@echo "── Ceph ────────────────────────────────────────────────"
+	@echo "  make infra-ceph-ping           - Ping ceph nodes"
+	@echo "  make infra-ceph-deploy         - Deploy Ceph cluster"
+	@echo "  make infra-ceph-status         - Check Ceph cluster status"
+	@echo "  make infra-ceph-clean          - Destroy Ceph cluster"
+	@echo ""
+
+# --- VM ---
 infra-plugin:
 	vagrant plugin install vagrant-disksize
 
@@ -37,22 +112,17 @@ infra-status:
 infra-clean:
 	cd $(VAGRANT_DIR) && vagrant destroy -f
 
-ssh-n%:
+infra-ssh-n%:
 	cd $(VAGRANT_DIR) && vagrant ssh wacloud-node-$*
 
-.PHONY: ansible-setup
-
-infra-ansible-ping:
+# --- K8s Ansible ---
+infra-k8s-ping:
 	ansible all -i $(INVENTORY) -m ping --extra-vars "ansible_ssh_pass=vagrant"
 
-infra-ansible-provision:
-	ansible-playbook -i $(INVENTORY) infra/k8s/ansible/site.yml --extra-vars "ansible_ssh_pass=vagrant"
+infra-k8s-provision:
+	ansible-playbook -i $(INVENTORY) $(PLAYBOOK) --extra-vars "ansible_ssh_pass=vagrant"
 
-# --- Kubeconfig Helper ---
-.PHONY: get-config
-KUBECONFIG_LOCAL = ~/.kube/config-wacloud
-
-infra-get-config:
+infra-k8s-get-config:
 	@echo "Fetching kubeconfig from node-1..."
 	@mkdir -p ~/.kube
 	@scp -i infra/vm/vagrant/.vagrant/machines/wacloud-node-1/virtualbox/private_key \
@@ -62,23 +132,33 @@ infra-get-config:
 	@echo "Config saved to $(KUBECONFIG_LOCAL)"
 	@echo "To use it, run: export KUBECONFIG=$(KUBECONFIG_LOCAL)"
 
-.PHONY: k8s-prep k8s-deploy k8s-diff k8s-destroy k8s-status
-HELMFILE_DIR = deploy/k8s
-HELMFILE     = helmfile -f $(HELMFILE_DIR)/helmfile.yaml
-KUBEVIRT_VER = v1.7.0
-CHART_PATH   = $(HELMFILE_DIR)/charts/kubevirt-stack
-
-k8s-setup:
+# --- K8s Helm ---
+infra-k8s-setup:
 	helm plugin install https://github.com/databus23/helm-diff --verify=false || true
 
-k8s-diff:
+infra-k8s-diff:
 	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) diff
 
-k8s-deploy:
+infra-k8s-deploy:
 	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) apply
 
-k8s-destroy:
+infra-k8s-destroy:
 	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && $(HELMFILE) destroy
 
-k8s-status:
+infra-k8s-status:
 	@export KUBECONFIG=$(KUBECONFIG_LOCAL) && kubectl get all -n kubevirt
+
+# --- Ceph ---
+infra-ceph-ping:
+	ansible all -i $(CEPH_INVENTORY) -m ping
+
+infra-ceph-deploy:
+	ansible-playbook -i $(CEPH_INVENTORY) $(CEPH_PLAYBOOK)
+
+infra-ceph-status:
+	ssh -i infra/vm/vagrant/.vagrant/machines/wacloud-node-6/virtualbox/private_key \
+		-o StrictHostKeyChecking=no \
+		vagrant@192.168.56.16 "sudo ceph -s"
+
+infra-ceph-clean:
+	ansible all -i $(CEPH_INVENTORY) -m shell -a "cephadm rm-cluster --fsid \$(ceph fsid) --force" || true

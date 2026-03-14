@@ -1,0 +1,3 @@
+---
+- name: restart ceph mon
+  shell: cephadm unit --fsid $(ceph fsid) --name mon.$(hostname) restart

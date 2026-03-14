@@ -1,0 +1,40 @@
+---
+- name: Check if ceph is already bootstrapped
+  stat:
+    path: /etc/ceph/ceph.conf
+  register: ceph_bootstrapped
+
+- name: Bootstrap Ceph cluster on first MON
+  shell: |
+    cephadm bootstrap \
+      --mon-ip {{ ansible_host }} \
+      --cluster-network 192.168.56.0/24 \
+      --initial-dashboard-user admin \
+      --initial-dashboard-password admin \
+      --skip-monitoring-stack \
+      --skip-pull
+  when:
+    - not ceph_bootstrapped.stat.exists
+    - inventory_hostname == groups['ceph_mons'][0]
+  register: bootstrap_result
+
+- name: Get ceph public key
+  shell: cat /etc/ceph/ceph.pub
+  register: ceph_pub_key
+  when: inventory_hostname == groups['ceph_mons'][0]
+
+- name: Share ceph public key to all nodes
+  shell: |
+    ssh-keyscan {{ hostvars[item].ansible_host }} >> /root/.ssh/known_hosts
+    ssh-copy-id -f -i /etc/ceph/ceph.pub root@{{ hostvars[item].ansible_host }}
+  loop: "{{ groups['ceph_mons'] }}"
+  when: inventory_hostname == groups['ceph_mons'][0]
+
+- name: Add other MONs to cluster
+  shell: ceph orch host add {{ item }} {{ hostvars[item].ansible_host }}
+  loop: "{{ groups['ceph_mons'][1:] }}"
+  when: inventory_hostname == groups['ceph_mons'][0]
+
+- name: Deploy MGR
+  shell: ceph orch apply mgr --placement="host:{{ groups['ceph_mgrs'][0] }}"
+  when: inventory_hostname == groups['ceph_mons'][0]

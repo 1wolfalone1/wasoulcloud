@@ -1,0 +1,18 @@
+---
+- name: Setup Ceph Cluster
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Configure MON + MGR
+  hosts: ceph_mons
+  become: yes
+  roles:
+    - mon
+
+- name: Configure OSD
+  hosts: ceph_osds
+  become: yes
+  roles:
+    - osd

@@ -1,0 +1,29 @@
+---
+- name: Load kernel modules for Ceph
+  copy:
+    dest: /etc/modules-load.d/ceph.conf
+    content: |
+      rbd
+      ceph
+
+- name: Install prerequisites
+  apt:
+    name: [python3, python3-pip, lvm2, curl, gnupg2]
+    update_cache: yes
+
+- name: Add Ceph repo key
+  get_url:
+    url: https://download.ceph.com/keys/release.asc
+    dest: /etc/apt/keyrings/ceph.asc
+    mode: '0644'
+
+- name: Add Ceph squid repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/ceph.asc] https://download.ceph.com/debian-squid/ jammy main"
+    state: present
+    update_cache: yes
+
+- name: Install ceph common packages
+  apt:
+    name: [ceph-common, cephadm]
+    state: present
