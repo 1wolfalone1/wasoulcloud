@@ -1,0 +1,3 @@
+[submodule "wasdn"]
+	path = wasdn
+	url = git@github.com:1wolfalone1/wasdn.git
