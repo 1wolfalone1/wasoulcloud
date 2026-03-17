@@ -1,11 +1,11 @@
 Vagrant.configure("2") do |config|
-  # Iterate to create 8 nodes
+  config.ssh.insert_key = false
   (1..8).each do |i|
     config.vm.define "wacloud-node-#{i}" do |node|
       # Base Image
       node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = "wacloud-node-#{i}"
-      
+      config.ssh.insert_key = false
       # Networking
       node.vm.network "private_network", ip: "192.168.56.#{10 + i}"
 

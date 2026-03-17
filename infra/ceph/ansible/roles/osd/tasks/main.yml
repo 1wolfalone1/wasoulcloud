@@ -5,7 +5,6 @@
   changed_when: false
 
 - name: Find the OSD disk (Any disk that is NOT sda and > 2GB)
-  # This finds the disk name (e.g., /dev/sdc) and ignores 10MB ghosts
   shell: |
     lsblk -dnbo NAME,SIZE,TYPE | \
     awk '$3=="disk" && $1!="sda" && $2>2147483648 {print "/dev/"$1}' | head -n1
@@ -13,26 +12,23 @@
   changed_when: false
 
 - name: Wipe the OSD disk signatures
-  # Use 'when' to skip if no disk was found or if it's too small
   shell: |
     wipefs -a {{ found_osd_disk.stdout }}
     dd if=/dev/zero of={{ found_osd_disk.stdout }} bs=1M count=20 conv=notrunc
-  become: yes
   when: found_osd_disk.stdout != ""
   ignore_errors: yes
 
 - name: Add OSDs for all nodes
-  # We point to the specific disk found on each node
   shell: ceph orch daemon add osd {{ item }}:{{ hostvars[item].found_osd_disk.stdout }}
   loop: "{{ groups['ceph_osds'] }}"
-  when: 
+  when:
     - inventory_hostname == groups['ceph_mons'][0]
     - hostvars[item].found_osd_disk.stdout is defined
     - hostvars[item].found_osd_disk.stdout != ""
   ignore_errors: yes
 
 - name: Wait for OSDs to be up
-  shell: "ceph osd stat | grep -E '3 osds: 3 up'"
+  shell: "ceph osd stat | grep -E '{{ groups['ceph_osds'] | length }} osds'"
   register: osd_stat
   until: osd_stat.rc == 0
   retries: 20
@@ -41,11 +37,14 @@
 
 - name: Create RBD pool for KubeVirt
   shell: |
-    # Check if pool exists first to prevent errors
     if ! ceph osd pool ls | grep -w rbd; then
       ceph osd pool create rbd 32
       ceph osd pool application enable rbd rbd
       rbd pool init rbd
     fi
   when: inventory_hostname == groups['ceph_mons'][0]
-  become: yes
+
+- name: Deploy RGW
+  shell: ceph orch apply rgw myrgw --placement="{{ groups['ceph_mons'][0] }}"
+  when: inventory_hostname == groups['ceph_mons'][0]
+  ignore_errors: yes

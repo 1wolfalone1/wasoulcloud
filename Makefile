@@ -72,7 +72,7 @@ infra-plugin:
 infra-up:
 	@echo "Checking VirtualBox Kernel Modules..."
 	sudo modprobe vboxdrv || echo "Module already loaded"
-	cd $(VAGRANT_DIR) && VAGRANT_EXPERIMENTAL="disks" vagrant up --no-provision
+	cd $(VAGRANT_DIR) && VAGRANT_EXPERIMENTAL="disks" vagrant up
 
 infra-boot:
 	@echo "Checking VirtualBox Kernel Modules..."
@@ -104,7 +104,7 @@ infra-k8s-provision:
 infra-k8s-get-config:
 	@echo "Fetching kubeconfig from node-1..."
 	@mkdir -p ~/.kube
-	@scp -i infra/vm/vagrant/.vagrant/machines/wacloud-node-1/virtualbox/private_key \
+	@scp -i ~/.vagrant.d/insecure_private_key \
 		-o StrictHostKeyChecking=no \
 		vagrant@192.168.56.11:/home/vagrant/.kube/config $(KUBECONFIG_LOCAL)
 	@sed -i 's/127.0.0.1/192.168.56.11/g' $(KUBECONFIG_LOCAL)
@@ -144,7 +144,7 @@ infra-ceph-clean:
 
 infra-ceph-dashboard:
 	@echo "Forwarding Ceph dashboard to https://localhost:8443"
-	ssh -i infra/vm/vagrant/.vagrant/machines/wacloud-node-6/virtualbox/private_key \
+	ssh -i ~/.vagrant.d/insecure_private_key \
 		-o StrictHostKeyChecking=no \
 		-L 8443:192.168.56.16:8443 \
 		vagrant@192.168.56.16 -N
