@@ -1,55 +1,50 @@
-# wacloud
+# wasoulcloud
 
-**wacloud** is a self-hosted Infrastructure-as-a-Service (IaaS) platform designed to transform bare-metal or virtualized hardware into a private cloud. By leveraging industry-standard cloud-native technologies, **wacloud** provides a seamless experience for managing Virtual Machines and storage at scale.
+A self-hosted Infrastructure-as-a-Service (IaaS) platform. Like OpenStack, but built to learn — and themed after souls games because why not.
 
-## 🚀 Project Overview
+Compute with KubeVirt, storage with Ceph, networking with [greattree](https://github.com/1wolfalone1/greattree).
 
-The goal of **wacloud** is to provide a robust, open-source cloud stack that handles the three pillars of computing: **Compute**, **Storage**, and **Networking**. It is designed for users who want public-cloud flexibility (like AWS EC2 or DigitalOcean) on their own hardware.
+## Stack
 
-### Core Technology Stack
+| Layer | Technology | Description |
+|---|---|---|
+| **Orchestration** | Kubernetes | The backbone |
+| **Compute** | KubeVirt | VMs inside K8s pods |
+| **Storage** | Ceph | Distributed block storage (RBD) + object storage (RGW) |
+| **Networking** | [greattree](https://github.com/1wolfalone1/greattree) | Custom SDN — L2 switching, VXLAN overlay, L3 routing, firewall, DHCP. |
 
-* **Orchestration:** [Kubernetes](https://kubernetes.io/) – The backbone of the entire cluster.
-* **Compute:** [KubeVirt](https://kubevirt.io/) – Enables running traditional Virtual Machines inside Kubernetes pods, allowing legacy and cloud-native workloads to coexist.
-* **Storage:** [Ceph](https://ceph.com/) – Distributed, software-defined storage providing highly available block storage for VM disks.
-* **Networking:** Built-in software-defined networking (SDN) to handle VM isolation, routing, and connectivity.
-* **Interface:** A unified **UI** and **CLI** for easy VM provisioning, monitoring, and resource management.
+## Infrastructure
 
-## 🏗️ Architecture
+```
+K8s cluster (nodes 1-5)
+|-- 1 master node
+|-- 4 worker nodes (KubeVirt VMs run here)
 
-The infrastructure is currently modeled using a 5-node topology:
+Ceph cluster (nodes 6-8)
+|-- 3 nodes (MON, MGR, OSD, RGW)
+```
 
-* **1 Master Node:** Handles the Kubernetes Control Plane and cluster API.
-* **4 Worker Nodes:** Managed nodes where VMs (via KubeVirt) and Storage (via Ceph) reside.
+Provisioned with Vagrant + Ansible. Everything automated via Makefile.
 
-## 🛠️ Development Environment
+## Quick Start
 
-For local development and rapid testing, the project utilizes:
+```bash
+make infra-up                 # boot 8 VMs
+make infra-k8s-provision      # setup K8s cluster
+make infra-k8s-get-config     # fetch kubeconfig
+make infra-k8s-deploy         # deploy KubeVirt
+make infra-ceph-deploy        # setup Ceph cluster
+```
 
-* **Vagrant:** To simulate a multi-node physical environment using VirtualBox.
-* **Ansible:** For automated, "one-click" provisioning of the entire OS and Kubernetes stack.
-* **Makefile:** Standardized entry points for project lifecycle management.
+## Project Structure
 
-## 🏁 Quick Start (Development Lab)
-
-1. **Spin up the virtual hardware:**
-
-    ```bash
-    make up
-    ```
-
-2. **Provision the Kubernetes cluster:**
-
-    ```bash
-    make provision
-    ```
-
-3. **Access the cluster from localhost:**
-
-    ```bash
-    make get-config
-    export KUBECONFIG=~/.kube/config-wacloud
-    kubectl get nodes
-    ```
-
----
-*Developed with a focus on simplicity, scalability, and sovereignty.*
+```
+wasoulcloud/
+├── infra/
+│   ├── vm/vagrant/       # Vagrantfile (8-node cluster)
+│   ├── k8s/ansible/      # K8s provisioning
+│   └── ceph/ansible/     # Ceph provisioning
+├── deploy/
+│   └── k8s/              # Helmfile + KubeVirt chart
+└── greattree/            # SDN (git submodule)
+```
